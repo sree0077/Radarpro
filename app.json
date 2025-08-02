@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "RadarPro",
+    "slug": "radarpro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to location to show nearby alerts and allow you to report incidents.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to location to show nearby alerts and allow you to report incidents.",
+        "NSCameraUsageDescription": "This app needs access to camera to capture photos for incident reports.",
+        "NSMicrophoneUsageDescription": "This app needs access to microphone to record voice messages for incident reports.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to photo library to select images for incident reports."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-location",
+      "expo-camera",
+      "expo-notifications",
+      "expo-av"
+    ],
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#FF0000",
+      "androidMode": "default",
+      "androidCollapsedTitle": "New Alert"
+    }
+  }
+} 
