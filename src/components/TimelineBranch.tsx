@@ -15,37 +15,37 @@ interface TimelineBranchProps {
 const getCategoryColor = (category: ReportCategory): string => {
   switch (category) {
     case 'police_checkpoint':
-      return '#FF4444'; // Red
-    case 'weather_alert':
-      return '#00BFFF'; // Light Blue
+      return '#1E40AF'; // Blue (matches marker design)
     case 'accident':
-      return '#0066FF'; // Blue
-    case 'general':
-      return '#666666'; // Gray
+      return '#DC2626'; // Red (matches marker design)
     case 'road_hazard':
-      return '#FF8800'; // Orange
+      return '#D97706'; // Orange (matches marker design)
     case 'traffic_jam':
-      return '#8A2BE2'; // Purple
+      return '#7C2D12'; // Orange-Red (matches marker design)
+    case 'weather_alert':
+      return '#0F766E'; // Teal (matches marker design)
+    case 'general':
+      return '#374151'; // Gray (matches marker design)
     default:
-      return '#666666';
+      return '#374151';
   }
 };
 
 const getCategoryIcon = (category: ReportCategory): string => {
   switch (category) {
     case 'police_checkpoint':
-      return '🚔';
+      return '🚔'; // Matches filter buttons
     case 'accident':
-      return '🚨';
+      return '🚨'; // Matches filter buttons
     case 'road_hazard':
-      return '⚠️';
+      return '⚠️'; // Matches filter buttons
     case 'traffic_jam':
-      return '🚗';
+      return '🚦'; // Matches filter buttons
     case 'weather_alert':
-      return '🌧️';
+      return '🌧️'; // Matches filter buttons
     case 'general':
     default:
-      return '📍';
+      return '📍'; // Matches filter buttons
   }
 };
 

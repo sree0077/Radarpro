@@ -27,7 +27,7 @@ const getCategoryIcon = (category: ReportCategory): string => {
     case 'road_hazard':
       return '⚠️';
     case 'traffic_jam':
-      return '🚗';
+      return '🚦';
     case 'weather_alert':
       return '🌧️';
     case 'general':
@@ -37,11 +37,32 @@ const getCategoryIcon = (category: ReportCategory): string => {
   }
 };
 
+const getCategoryColor = (category: ReportCategory): { primary: string; secondary: string; border: string } => {
+  switch (category) {
+    case 'police_checkpoint':
+      return { primary: '#1E40AF', secondary: '#3B82F6', border: '#1D4ED8' }; // Blue
+    case 'accident':
+      return { primary: '#DC2626', secondary: '#EF4444', border: '#B91C1C' }; // Red
+    case 'road_hazard':
+      return { primary: '#D97706', secondary: '#F59E0B', border: '#B45309' }; // Orange
+    case 'traffic_jam':
+      return { primary: '#7C2D12', secondary: '#EA580C', border: '#9A3412' }; // Orange-Red
+    case 'weather_alert':
+      return { primary: '#0F766E', secondary: '#14B8A6', border: '#0D9488' }; // Teal
+    case 'general':
+      return { primary: '#374151', secondary: '#6B7280', border: '#4B5563' }; // Gray
+    default:
+      return { primary: '#374151', secondary: '#6B7280', border: '#4B5563' }; // Gray
+  }
+};
+
 export const ReportMarker: React.FC<ReportMarkerProps> = ({ report, onPress }) => {
   // Don't render markers on web to avoid compatibility issues
   if (Platform.OS === 'web' || !Marker) {
     return null;
   }
+
+  const icon = getCategoryIcon(report.category);
 
   return (
     <Marker
@@ -53,34 +74,27 @@ export const ReportMarker: React.FC<ReportMarkerProps> = ({ report, onPress }) =
       description={report.description}
       onPress={() => onPress(report)}
     >
-      {/* Custom marker with category icon */}
-      <View style={styles.markerContainer}>
-        <Text style={styles.markerIcon}>
-          {getCategoryIcon(report.category)}
-        </Text>
-      </View>
+      {/* Clean marker design - just the symbol with text shadow for visibility */}
+      <Text style={styles.markerIcon}>
+        {icon}
+      </Text>
     </Marker>
   );
 };
 
 const styles = StyleSheet.create({
-  markerContainer: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 8,
-    borderWidth: 2,
-    borderColor: '#0066FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 40,
-    minHeight: 40,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
   markerIcon: {
-    fontSize: 20,
+    fontSize: 32, // Large size for good visibility
+    fontWeight: 'bold',
+    textAlign: 'center',
+    // Text shadow for better visibility against map backgrounds
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+    // Additional shadow for iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
   },
 });

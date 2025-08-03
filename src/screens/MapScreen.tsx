@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, Animated } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import MapView, { Region } from 'react-native-maps';
-import { FAB, Portal, Modal, Text, Button, Snackbar, IconButton } from 'react-native-paper';
+import { FAB, Portal, Modal, Text, Button, Snackbar } from 'react-native-paper';
 
 import { ReportCard } from '../components/ReportCard';
 import { ReportMarker } from '../components/ReportMarker';
@@ -22,14 +22,12 @@ export const MapScreen: React.FC = () => {
     longitudeDelta: 0.0421,
   });
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [newReportNotification, setNewReportNotification] = useState<string | null>(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
 
   const mapRef = useRef<MapView>(null);
   const subscriptionRef = useRef<any>(null);
-  const refreshIconRotation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     initializeMap();
@@ -64,41 +62,18 @@ export const MapScreen: React.FC = () => {
     }
   };
 
-  const loadReports = async (showRefreshIndicator = false) => {
+  const loadReports = async () => {
     try {
-      if (showRefreshIndicator) {
-        setRefreshing(true);
-        // Animate refresh icon
-        Animated.timing(refreshIconRotation, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }).start(() => {
-          refreshIconRotation.setValue(0);
-        });
-      }
-
-      const { data, error } = showRefreshIndicator
-        ? await SupabaseService.refreshReports()
-        : await SupabaseService.getActiveReports();
+      const { data, error } = await SupabaseService.getActiveReports();
       if (error) {
         console.error('Error loading reports:', error);
         Alert.alert('Error', 'Failed to load reports. Please try again.');
         return;
       }
       setReports(data || []);
-
-      if (showRefreshIndicator) {
-        setSnackbarVisible(true);
-        setNewReportNotification('Reports refreshed successfully');
-      }
     } catch (error) {
       console.error('Error loading reports:', error);
       Alert.alert('Error', 'Failed to load reports. Please try again.');
-    } finally {
-      if (showRefreshIndicator) {
-        setRefreshing(false);
-      }
     }
   };
 
@@ -203,9 +178,7 @@ export const MapScreen: React.FC = () => {
     }
   };
 
-  const handleManualRefresh = () => {
-    loadReports(true);
-  };
+
 
   const hideSnackbar = () => {
     setSnackbarVisible(false);
@@ -259,37 +232,7 @@ export const MapScreen: React.FC = () => {
         ))}
       </MapView>
 
-      {/* Refresh Button */}
-      <View style={styles.refreshContainer}>
-        <IconButton
-          icon="refresh"
-          size={24}
-          iconColor="#0066FF"
-          containerColor="white"
-          onPress={handleManualRefresh}
-          disabled={refreshing}
-          style={[
-            styles.refreshButton,
-            {
-              transform: [
-                {
-                  rotate: refreshIconRotation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', '360deg'],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-        {refreshing && (
-          <ActivityIndicator
-            size="small"
-            color="#0066FF"
-            style={styles.refreshIndicator}
-          />
-        )}
-      </View>
+
 
       <FAB
         style={styles.fab}
@@ -357,24 +300,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  refreshContainer: {
-    position: 'absolute',
-    top: 60,
-    right: 16,
-    alignItems: 'center',
-  },
-  refreshButton: {
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  refreshIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
+
   fab: {
     position: 'absolute',
     margin: 16,
