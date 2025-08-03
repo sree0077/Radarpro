@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
-import { Text, Chip, FAB } from 'react-native-paper';
-import { ReportCard } from '../components/ReportCard';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Animated } from 'react-native';
+import { Text, Chip, FAB, Snackbar, IconButton } from 'react-native-paper';
+import { TimelineBranch } from '../components/TimelineBranch';
 import { Report, ReportCategory } from '../types';
 import { SupabaseService } from '../services/supabase';
 import { LocationService } from '../services/locationService';
@@ -22,20 +22,59 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [newReportNotification, setNewReportNotification] = useState<string | null>(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
 
-  const categories: { category: ReportCategory; label: string; icon: string }[] = [
-    { category: 'police_checkpoint', label: 'Police', icon: '🚔' },
-    { category: 'accident', label: 'Accident', icon: '🚨' },
-    { category: 'road_hazard', label: 'Hazard', icon: '⚠️' },
-    { category: 'traffic_jam', label: 'Traffic', icon: '🚗' },
-    { category: 'weather_alert', label: 'Weather', icon: '🌧️' },
-    { category: 'general', label: 'General', icon: '📍' },
+  const subscriptionRef = useRef<any>(null);
+  const refreshIconRotation = useRef(new Animated.Value(0)).current;
+
+  const getCategoryColor = (category: ReportCategory): string => {
+    switch (category) {
+      case 'police_checkpoint':
+        return '#FF4444'; // Red
+      case 'weather_alert':
+        return '#00BFFF'; // Light Blue
+      case 'accident':
+        return '#0066FF'; // Blue
+      case 'general':
+        return '#666666'; // Gray
+      case 'road_hazard':
+        return '#FF8800'; // Orange
+      case 'traffic_jam':
+        return '#8A2BE2'; // Purple
+      default:
+        return '#666666';
+    }
+  };
+
+  const categories: { category: ReportCategory; label: string; icon: string; color: string }[] = [
+    { category: 'police_checkpoint', label: 'Police', icon: '🚔', color: getCategoryColor('police_checkpoint') },
+    { category: 'accident', label: 'Accident', icon: '🚨', color: getCategoryColor('accident') },
+    { category: 'road_hazard', label: 'Hazard', icon: '⚠️', color: getCategoryColor('road_hazard') },
+    { category: 'traffic_jam', label: 'Traffic', icon: '🚗', color: getCategoryColor('traffic_jam') },
+    { category: 'weather_alert', label: 'Weather', icon: '🌧️', color: getCategoryColor('weather_alert') },
+    { category: 'general', label: 'General', icon: '📍', color: getCategoryColor('general') },
   ];
 
   useEffect(() => {
     initializeScreen();
     setupRealtimeSubscription();
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+    };
   }, []);
+
+  // Refresh reports when appUser changes (profile switch)
+  useEffect(() => {
+    if (appUser) {
+      setOffset(0);
+      loadReports(true);
+    }
+  }, [appUser?.id]);
 
   useEffect(() => {
     filterReports();
@@ -45,6 +84,7 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
     await Promise.all([
       loadUserLocation(),
       loadReports(),
+      SupabaseService.ensureUserUsernames(), // Ensure all users have usernames
     ]);
     setLoading(false);
   };
@@ -61,7 +101,10 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
   const loadReports = async (isRefresh = false) => {
     try {
       const currentOffset = isRefresh ? 0 : offset;
-      const { data, error } = await SupabaseService.getReports(20, currentOffset);
+      
+      const { data, error } = isRefresh
+        ? await SupabaseService.refreshReports(20, currentOffset)
+        : await SupabaseService.getActiveReports(20, currentOffset);
       
       if (error) {
         console.error('Error loading reports:', error);
@@ -74,7 +117,12 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
         setReports(newReports);
         setOffset(20);
       } else {
-        setReports(prev => [...prev, ...newReports]);
+        // Prevent duplicate reports by checking IDs
+        setReports(prev => {
+          const existingIds = new Set(prev.map(r => r.id));
+          const uniqueNewReports = newReports.filter(r => !existingIds.has(r.id));
+          return [...prev, ...uniqueNewReports];
+        });
         setOffset(prev => prev + 20);
       }
 
@@ -85,23 +133,76 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
   };
 
   const setupRealtimeSubscription = () => {
-    const subscription = SupabaseService.subscribeToReports((payload) => {
+    const subscription = SupabaseService.subscribeToReports(async (payload) => {
+      console.log('📡 Timeline real-time update received:', payload.eventType);
+
       if (payload.eventType === 'INSERT') {
-        setReports(prev => [payload.new, ...prev]);
+        // For new reports, fetch the complete data with user info
+        try {
+          const { data: newReport, error } = await SupabaseService.getReportById(payload.new.id);
+          if (error) {
+            console.error('Error fetching new report:', error);
+            return;
+          }
+          if (newReport) {
+            setReports(prev => {
+              // Check if report already exists to prevent duplicates
+              const exists = prev.some(r => r.id === newReport.id);
+              if (exists) return prev;
+
+              // Show notification for new report
+              setNewReportNotification(`New ${newReport.category} report by ${newReport.user?.username || 'Anonymous'}`);
+              setSnackbarVisible(true);
+
+              return [newReport, ...prev];
+            });
+          }
+        } catch (error) {
+          console.error('Error in INSERT handler:', error);
+        }
       } else if (payload.eventType === 'UPDATE') {
-        setReports(prev => 
-          prev.map(report => 
-            report.id === payload.new.id ? payload.new : report
-          )
-        );
+        // Handle report updates including expiry
+        try {
+          const { data: updatedReport, error } = await SupabaseService.getReportById(payload.new.id);
+          if (error) {
+            console.error('Error fetching updated report:', error);
+            return;
+          }
+
+          if (updatedReport) {
+            // Check if report was marked as expired
+            if (updatedReport.status === 'expired') {
+              // Remove expired report from timeline
+              setReports(prev => prev.filter(report => report.id !== updatedReport.id));
+              setNewReportNotification('Report expired and removed');
+              setSnackbarVisible(true);
+            } else {
+              // Update active report
+              setReports(prev =>
+                prev.map(report =>
+                  report.id === payload.new.id ? updatedReport : report
+                )
+              );
+              setNewReportNotification(`Report updated by ${updatedReport.user?.username || 'Anonymous'}`);
+              setSnackbarVisible(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error in UPDATE handler:', error);
+        }
       } else if (payload.eventType === 'DELETE') {
-        setReports(prev => 
+        setReports(prev =>
           prev.filter(report => report.id !== payload.old.id)
         );
+
+        // Show notification for deleted report
+        setNewReportNotification('Report removed');
+        setSnackbarVisible(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    subscriptionRef.current = subscription;
+    return subscription;
   };
 
   const filterReports = () => {
@@ -141,8 +242,32 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
   const onRefresh = async () => {
     setRefreshing(true);
     setOffset(0);
+
+    // Animate refresh icon
+    Animated.timing(refreshIconRotation, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start(() => {
+      refreshIconRotation.setValue(0);
+    });
+
     await loadReports(true);
+
+    // Show success notification
+    setNewReportNotification('Timeline refreshed successfully');
+    setSnackbarVisible(true);
+
     setRefreshing(false);
+  };
+
+  const handleManualRefresh = () => {
+    onRefresh();
+  };
+
+  const hideSnackbar = () => {
+    setSnackbarVisible(false);
+    setNewReportNotification(null);
   };
 
   const loadMore = async () => {
@@ -161,6 +286,10 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
     navigation.navigate('NewReport');
   };
 
+
+
+
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -172,35 +301,82 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
 
   return (
     <View style={styles.container}>
-      <View style={styles.filterContainer}>
-        <FlatList
-          horizontal
-          data={categories}
-          keyExtractor={(item) => item.category}
-          renderItem={({ item }) => (
-            <Chip
-              mode={selectedCategories.includes(item.category) ? 'flat' : 'outlined'}
-              selected={selectedCategories.includes(item.category)}
-              onPress={() => toggleCategory(item.category)}
-              style={styles.filterChip}
-              textStyle={styles.filterChipText}
-            >
-              {item.icon} {item.label}
-            </Chip>
+      {/* Header with Refresh Button */}
+      <View style={styles.headerContainer}>
+        <View style={styles.filterContainer}>
+          <FlatList
+            horizontal
+            data={categories}
+            keyExtractor={(item) => item.category}
+            renderItem={({ item }) => (
+              <Chip
+                mode={selectedCategories.includes(item.category) ? 'flat' : 'outlined'}
+                selected={selectedCategories.includes(item.category)}
+                onPress={() => toggleCategory(item.category)}
+                style={[
+                  styles.filterChip,
+                  selectedCategories.includes(item.category) && {
+                    backgroundColor: item.color,
+                  }
+                ]}
+                textStyle={[
+                  styles.filterChipText,
+                  selectedCategories.includes(item.category) && {
+                    color: 'white',
+                  }
+                ]}
+              >
+                {item.icon} {item.label}
+              </Chip>
+            )}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterList}
+          />
+        </View>
+
+        {/* Manual Refresh Button */}
+        <View style={styles.refreshButtonContainer}>
+          <IconButton
+            icon="refresh"
+            size={24}
+            iconColor="#0066FF"
+            containerColor="white"
+            onPress={handleManualRefresh}
+            disabled={refreshing}
+            style={[
+              styles.refreshButton,
+              {
+                transform: [
+                  {
+                    rotate: refreshIconRotation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          {refreshing && (
+            <ActivityIndicator
+              size="small"
+              color="#0066FF"
+              style={styles.refreshIndicator}
+            />
           )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterList}
-        />
+        </View>
       </View>
 
       <FlatList
         data={filteredReports}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ReportCard
+        renderItem={({ item, index }) => (
+          <TimelineBranch
             report={item}
             onPress={handleReportPress}
-            userLocation={userLocation}
+            isLeft={index % 2 === 1}
+            isFirst={index === 0}
+            isLast={index === filteredReports.length - 1}
           />
         )}
         refreshControl={
@@ -208,6 +384,7 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.1}
+        contentContainerStyle={styles.reportsList}
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.loadingMoreContainer}>
@@ -234,6 +411,20 @@ export const TimelineScreen: React.FC<TimelineScreenProps> = ({ navigation }) =>
         onPress={handleNewReport}
         label="New Report"
       />
+
+      {/* Real-time Update Notification */}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={hideSnackbar}
+        duration={3000}
+        style={styles.snackbar}
+        action={{
+          label: 'Dismiss',
+          onPress: hideSnackbar,
+        }}
+      >
+        {newReportNotification}
+      </Snackbar>
     </View>
   );
 };
@@ -247,6 +438,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 16,
@@ -254,19 +446,25 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   filterContainer: {
-    backgroundColor: 'white',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    flex: 1,
+    paddingVertical: 8,
   },
   filterList: {
     paddingHorizontal: 16,
+    paddingVertical: 4,
   },
   filterChip: {
     marginRight: 8,
+    marginBottom: 4,
   },
   filterChipText: {
     fontSize: 12,
+    fontWeight: '500',
+  },
+  reportsList: {
+    paddingBottom: 80, // Space for FAB
+    paddingTop: 16,
+    flexGrow: 1,
   },
   loadingMoreContainer: {
     padding: 16,
@@ -282,16 +480,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    minHeight: 400,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+    lineHeight: 24,
   },
   fab: {
     position: 'absolute',
     margin: 16,
     right: 0,
     bottom: 0,
+    backgroundColor: '#0066FF',
   },
-}); 
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  refreshButtonContainer: {
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  refreshButton: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  refreshIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  snackbar: {
+    backgroundColor: '#0066FF',
+  },
+
+});

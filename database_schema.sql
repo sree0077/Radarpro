@@ -110,9 +110,9 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.media_files ENABLE ROW LEVEL SECURITY;
 
--- Users policies
-CREATE POLICY "Users can view their own profile" ON public.users
-    FOR SELECT USING (auth.uid() = id);
+-- Users policies - Allow viewing basic info of other users for reports
+CREATE POLICY "Users can view basic info of all users" ON public.users
+    FOR SELECT USING (true);
 
 CREATE POLICY "Users can update their own profile" ON public.users
     FOR UPDATE USING (auth.uid() = id);

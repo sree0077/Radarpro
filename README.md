@@ -285,7 +285,8 @@ npm run android
 src/
 ├── components/          # Reusable UI components
 │   ├── ReportCard.tsx   # Report display component
-│   └── ReportMarker.tsx # Map marker component
+│   ├── TimelineBranch.tsx # Timeline branch component
+│   └── ExpiryIndicator.tsx # Report expiry indicator
 ├── contexts/            # React contexts
 │   └── AuthContext.tsx  # Authentication context
 ├── navigation/          # Navigation configuration

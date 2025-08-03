@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Card, Chip, Avatar } from 'react-native-paper';
 import { Report, ReportCategory } from '../types';
 import { LocationService } from '../services/locationService';
+import { ExpiryIndicator } from './ExpiryIndicator';
 
 interface ReportCardProps {
   report: Report;
@@ -80,6 +81,8 @@ export const ReportCard: React.FC<ReportCardProps> = ({
   onPress, 
   userLocation 
 }) => {
+
+
   const categoryColor = getCategoryColor(report.category);
   const categoryLabel = getCategoryLabel(report.category);
   const categoryIcon = getCategoryIcon(report.category);
@@ -151,16 +154,24 @@ export const ReportCard: React.FC<ReportCardProps> = ({
           )}
 
           <View style={styles.footer}>
-            {distance && (
-              <Text style={styles.distance}>
-                📍 {LocationService.formatDistance(distance)} away
-              </Text>
-            )}
-            <View style={[styles.statusIndicator, { backgroundColor: categoryColor }]}>
-              <Text style={styles.statusText}>
-                {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-              </Text>
+            <View style={styles.footerLeft}>
+              {distance && (
+                <Text style={styles.distance}>
+                  📍 {LocationService.formatDistance(distance)} away
+                </Text>
+              )}
+              <View style={[styles.statusIndicator, { backgroundColor: categoryColor }]}>
+                <Text style={styles.statusText}>
+                  {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                </Text>
+              </View>
             </View>
+            <ExpiryIndicator
+              category={report.category}
+              updatedAt={report.updated_at}
+              compact={true}
+              style={styles.expiryIndicator}
+            />
           </View>
         </Card.Content>
       </Card>
@@ -172,31 +183,37 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: 16,
     marginVertical: 8,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    borderRadius: 12,
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+    flexWrap: 'wrap',
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0, // Allow text to shrink
   },
   userDetails: {
     marginLeft: 12,
     flex: 1,
+    minWidth: 0, // Allow text to shrink
   },
   username: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    flexShrink: 1, // Allow text to shrink
   },
   timestamp: {
     fontSize: 12,
@@ -205,6 +222,7 @@ const styles = StyleSheet.create({
   },
   categoryChip: {
     marginLeft: 8,
+    alignSelf: 'flex-start',
   },
   description: {
     fontSize: 14,
@@ -215,10 +233,12 @@ const styles = StyleSheet.create({
   mediaContainer: {
     flexDirection: 'row',
     marginBottom: 12,
+    flexWrap: 'wrap',
   },
   mediaItem: {
     alignItems: 'center',
     marginRight: 16,
+    marginBottom: 8,
   },
   mediaImage: {
     width: 60,
@@ -229,6 +249,7 @@ const styles = StyleSheet.create({
   mediaLabel: {
     fontSize: 12,
     color: '#666',
+    textAlign: 'center',
   },
   audioIndicator: {
     width: 60,
@@ -246,10 +267,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   distance: {
     fontSize: 12,
     color: '#666',
+    marginRight: 8,
   },
   statusIndicator: {
     paddingHorizontal: 8,
@@ -260,5 +288,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: 'white',
     fontWeight: '600',
+  },
+  expiryIndicator: {
+    marginLeft: 8,
   },
 }); 

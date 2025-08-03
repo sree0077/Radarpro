@@ -27,6 +27,8 @@ export interface Report {
   longitude: number;
   report_timestamp: string;
   status: ReportStatus;
+  created_at: string;
+  updated_at: string;
   media_files?: MediaFile[];
   user?: User;
 }

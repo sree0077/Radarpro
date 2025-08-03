@@ -239,6 +239,29 @@ export const NewReportScreen: React.FC<NewReportScreenProps> = ({ navigation }) 
       const { data: report, error: reportError } = await SupabaseService.createReport(reportData);
 
       if (reportError) {
+        console.error('Error creating report:', reportError);
+
+        // Provide specific error messages for common issues
+        if (reportError.code === '23503') {
+          Alert.alert(
+            'Profile Error',
+            'Your user profile is not set up properly. Please try logging out and logging back in.',
+            [
+              { text: 'OK' }
+            ]
+          );
+          return;
+        } else if (reportError.code === '42P01') {
+          Alert.alert(
+            'Database Error',
+            'The database is not set up properly. Please contact the administrator.',
+            [
+              { text: 'OK' }
+            ]
+          );
+          return;
+        }
+
         throw reportError;
       }
 

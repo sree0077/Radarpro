@@ -1,32 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Marker } from 'react-native-maps';
+import { Platform, View, Text, StyleSheet } from 'react-native';
 import { Report, ReportCategory } from '../types';
+
+// Conditional import to avoid web issues
+let Marker: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    const maps = require('react-native-maps');
+    Marker = maps.Marker;
+  } catch (error) {
+    console.warn('react-native-maps not available');
+  }
+}
 
 interface ReportMarkerProps {
   report: Report;
   onPress: (report: Report) => void;
 }
 
-const getMarkerColor = (category: ReportCategory): string => {
-  switch (category) {
-    case 'police_checkpoint':
-      return '#FF0000'; // Red
-    case 'accident':
-      return '#FF6600'; // Orange
-    case 'road_hazard':
-      return '#FFCC00'; // Yellow
-    case 'traffic_jam':
-      return '#0066FF'; // Blue
-    case 'weather_alert':
-      return '#00CCFF'; // Light Blue
-    case 'general':
-    default:
-      return '#666666'; // Gray
-  }
-};
-
-const getMarkerIcon = (category: ReportCategory): string => {
+const getCategoryIcon = (category: ReportCategory): string => {
   switch (category) {
     case 'police_checkpoint':
       return '🚔';
@@ -39,14 +31,17 @@ const getMarkerIcon = (category: ReportCategory): string => {
     case 'weather_alert':
       return '🌧️';
     case 'general':
+      return '📍';
     default:
       return '📍';
   }
 };
 
 export const ReportMarker: React.FC<ReportMarkerProps> = ({ report, onPress }) => {
-  const markerColor = getMarkerColor(report.category);
-  const markerIcon = getMarkerIcon(report.category);
+  // Don't render markers on web to avoid compatibility issues
+  if (Platform.OS === 'web' || !Marker) {
+    return null;
+  }
 
   return (
     <Marker
@@ -54,11 +49,15 @@ export const ReportMarker: React.FC<ReportMarkerProps> = ({ report, onPress }) =
         latitude: report.latitude,
         longitude: report.longitude,
       }}
+      title={report.title}
+      description={report.description}
       onPress={() => onPress(report)}
     >
-      <View style={[styles.markerContainer, { backgroundColor: markerColor }]}>
-        <Text style={styles.markerIcon}>{markerIcon}</Text>
-        <View style={styles.markerDot} />
+      {/* Custom marker with category icon */}
+      <View style={styles.markerContainer}>
+        <Text style={styles.markerIcon}>
+          {getCategoryIcon(report.category)}
+        </Text>
       </View>
     </Marker>
   );
@@ -66,34 +65,22 @@ export const ReportMarker: React.FC<ReportMarkerProps> = ({ report, onPress }) =
 
 const styles = StyleSheet.create({
   markerContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 2,
+    borderColor: '#0066FF',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: 'white',
+    minWidth: 40,
+    minHeight: 40,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 4,
   },
   markerIcon: {
-    fontSize: 16,
-    color: 'white',
+    fontSize: 20,
   },
-  markerDot: {
-    position: 'absolute',
-    bottom: -8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-}); 
+});

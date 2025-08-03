@@ -22,6 +22,9 @@
         "NSCameraUsageDescription": "This app needs access to camera to capture photos for incident reports.",
         "NSMicrophoneUsageDescription": "This app needs access to microphone to record voice messages for incident reports.",
         "NSPhotoLibraryUsageDescription": "This app needs access to photo library to select images for incident reports."
+      },
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
       }
     },
     "android": {
@@ -39,7 +42,12 @@
         "WRITE_EXTERNAL_STORAGE",
         "VIBRATE",
         "WAKE_LOCK"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

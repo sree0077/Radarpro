@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
-import { FAB, Portal, Modal, Text, Button } from 'react-native-paper';
-import { ReportMarker } from '../components/ReportMarker';
+import { View, StyleSheet, Alert, ActivityIndicator, Animated } from 'react-native';
+import MapView, { Region } from 'react-native-maps';
+import { FAB, Portal, Modal, Text, Button, Snackbar, IconButton } from 'react-native-paper';
+
 import { ReportCard } from '../components/ReportCard';
+import { ReportMarker } from '../components/ReportMarker';
 import { Report } from '../types';
 import { SupabaseService } from '../services/supabase';
 import { LocationService } from '../services/locationService';
@@ -21,13 +22,26 @@ export const MapScreen: React.FC = () => {
     longitudeDelta: 0.0421,
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [newReportNotification, setNewReportNotification] = useState<string | null>(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+
   const mapRef = useRef<MapView>(null);
+  const subscriptionRef = useRef<any>(null);
+  const refreshIconRotation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     initializeMap();
     loadReports();
     setupRealtimeSubscription();
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+    };
   }, []);
 
   const initializeMap = async () => {
@@ -50,43 +64,118 @@ export const MapScreen: React.FC = () => {
     }
   };
 
-  const loadReports = async () => {
+  const loadReports = async (showRefreshIndicator = false) => {
     try {
-      const { data, error } = await SupabaseService.getReports();
+      if (showRefreshIndicator) {
+        setRefreshing(true);
+        // Animate refresh icon
+        Animated.timing(refreshIconRotation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }).start(() => {
+          refreshIconRotation.setValue(0);
+        });
+      }
+
+      const { data, error } = showRefreshIndicator
+        ? await SupabaseService.refreshReports()
+        : await SupabaseService.getActiveReports();
       if (error) {
         console.error('Error loading reports:', error);
+        Alert.alert('Error', 'Failed to load reports. Please try again.');
         return;
       }
       setReports(data || []);
+
+      if (showRefreshIndicator) {
+        setSnackbarVisible(true);
+        setNewReportNotification('Reports refreshed successfully');
+      }
     } catch (error) {
       console.error('Error loading reports:', error);
+      Alert.alert('Error', 'Failed to load reports. Please try again.');
+    } finally {
+      if (showRefreshIndicator) {
+        setRefreshing(false);
+      }
     }
   };
 
   const setupRealtimeSubscription = () => {
-    const subscription = SupabaseService.subscribeToReports((payload) => {
+    const subscription = SupabaseService.subscribeToReports(async (payload) => {
+      console.log('📡 Real-time update received:', payload.eventType);
+
       if (payload.eventType === 'INSERT') {
-        setReports(prev => [payload.new, ...prev]);
+        // Fetch complete report data with user info for new reports
+        try {
+          const { data: newReport, error } = await SupabaseService.getReportById(payload.new.id);
+          if (error) {
+            console.error('Error fetching new report:', error);
+            return;
+          }
+          if (newReport) {
+            setReports(prev => {
+              // Check if report already exists to prevent duplicates
+              const exists = prev.some(r => r.id === newReport.id);
+              if (exists) return prev;
+
+              // Show notification for new report
+              setNewReportNotification(`New ${newReport.category} report added`);
+              setSnackbarVisible(true);
+
+              return [newReport, ...prev];
+            });
+          }
+        } catch (error) {
+          console.error('Error in INSERT handler:', error);
+        }
       } else if (payload.eventType === 'UPDATE') {
-        setReports(prev => 
-          prev.map(report => 
-            report.id === payload.new.id ? payload.new : report
-          )
-        );
+        // Handle report updates including expiry
+        try {
+          const { data: updatedReport, error } = await SupabaseService.getReportById(payload.new.id);
+          if (error) {
+            console.error('Error fetching updated report:', error);
+            return;
+          }
+
+          if (updatedReport) {
+            // Check if report was marked as expired
+            if (updatedReport.status === 'expired') {
+              // Remove expired report from map
+              setReports(prev => prev.filter(report => report.id !== updatedReport.id));
+              setNewReportNotification('Report expired and removed');
+              setSnackbarVisible(true);
+            } else {
+              // Update active report
+              setReports(prev =>
+                prev.map(report =>
+                  report.id === payload.new.id ? updatedReport : report
+                )
+              );
+              setNewReportNotification('Report updated');
+              setSnackbarVisible(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error in UPDATE handler:', error);
+        }
       } else if (payload.eventType === 'DELETE') {
-        setReports(prev => 
+        setReports(prev =>
           prev.filter(report => report.id !== payload.old.id)
         );
+
+        // Show notification for deleted report
+        setNewReportNotification('Report removed');
+        setSnackbarVisible(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    subscriptionRef.current = subscription;
+    return subscription;
   };
 
-  const handleMarkerPress = (report: Report) => {
-    setSelectedReport(report);
-    setModalVisible(true);
-  };
+
 
   const handleReportPress = (report: Report) => {
     setSelectedReport(report);
@@ -112,6 +201,15 @@ export const MapScreen: React.FC = () => {
     } catch (error) {
       console.error('Error centering on user:', error);
     }
+  };
+
+  const handleManualRefresh = () => {
+    loadReports(true);
+  };
+
+  const hideSnackbar = () => {
+    setSnackbarVisible(false);
+    setNewReportNotification(null);
   };
 
   const filterReportsByRadius = () => {
@@ -144,7 +242,6 @@ export const MapScreen: React.FC = () => {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         region={region}
         onRegionChangeComplete={setRegion}
         showsUserLocation={true}
@@ -152,14 +249,47 @@ export const MapScreen: React.FC = () => {
         showsCompass={true}
         showsScale={true}
       >
+        {/* Render report markers */}
         {filteredReports.map((report) => (
           <ReportMarker
             key={report.id}
             report={report}
-            onPress={handleMarkerPress}
+            onPress={handleReportPress}
           />
         ))}
       </MapView>
+
+      {/* Refresh Button */}
+      <View style={styles.refreshContainer}>
+        <IconButton
+          icon="refresh"
+          size={24}
+          iconColor="#0066FF"
+          containerColor="white"
+          onPress={handleManualRefresh}
+          disabled={refreshing}
+          style={[
+            styles.refreshButton,
+            {
+              transform: [
+                {
+                  rotate: refreshIconRotation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+        {refreshing && (
+          <ActivityIndicator
+            size="small"
+            color="#0066FF"
+            style={styles.refreshIndicator}
+          />
+        )}
+      </View>
 
       <FAB
         style={styles.fab}
@@ -192,6 +322,20 @@ export const MapScreen: React.FC = () => {
           )}
         </Modal>
       </Portal>
+
+      {/* Real-time Update Notification */}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={hideSnackbar}
+        duration={3000}
+        style={styles.snackbar}
+        action={{
+          label: 'Dismiss',
+          onPress: hideSnackbar,
+        }}
+      >
+        {newReportNotification}
+      </Snackbar>
     </View>
   );
 };
@@ -213,6 +357,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  refreshContainer: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    alignItems: 'center',
+  },
+  refreshButton: {
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  refreshIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
   fab: {
     position: 'absolute',
     margin: 16,
@@ -231,4 +393,7 @@ const styles = StyleSheet.create({
   closeButton: {
     marginTop: 16,
   },
-}); 
+  snackbar: {
+    backgroundColor: '#0066FF',
+  },
+});

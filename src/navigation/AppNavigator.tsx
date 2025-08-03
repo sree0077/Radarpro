@@ -8,6 +8,7 @@ import { MapScreen } from '../screens/MapScreen';
 import { TimelineScreen } from '../screens/TimelineScreen';
 import { NewReportScreen } from '../screens/NewReportScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { ReportDetailScreen } from '../screens/ReportDetailScreen';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -81,6 +82,13 @@ const MainStack = () => {
         options={{ 
           title: 'New Report',
           presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="ReportDetail" 
+        component={ReportDetailScreen}
+        options={{ 
+          title: 'Report Details',
         }}
       />
     </Stack.Navigator>

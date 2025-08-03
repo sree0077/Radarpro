@@ -190,7 +190,7 @@ export const ProfileScreen: React.FC = () => {
           <List.Item
             title="Accidents"
             description="🚨 Receive alerts about accidents"
-            left={() => <List.Icon icon="car-crash" />}
+            left={() => <List.Icon icon="car-emergency" />}
             right={() => (
               <Switch
                 value={notificationPreferences.accidents}
