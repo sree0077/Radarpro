@@ -1,22 +1,24 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { 
-  Card, 
-  Text, 
-  Button, 
-  Switch, 
-  TextInput, 
-  Avatar, 
+import {
+  Card,
+  Text,
+  Button,
+  Switch,
+  TextInput,
+  Avatar,
   Divider,
   List,
   Dialog,
   Portal
 } from 'react-native-paper';
 import Slider from '@react-native-community/slider';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationPreferences } from '../types';
 
 export const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation();
   const { user, appUser, updateUserProfile, signOut } = useAuth();
   const [editing, setEditing] = useState(false);
   const [username, setUsername] = useState(appUser?.username || '');
@@ -259,8 +261,39 @@ export const ProfileScreen: React.FC = () => {
 
       <Card style={styles.card}>
         <Card.Content>
+          <Text style={styles.sectionTitle}>Notification Settings</Text>
+
+          <List.Item
+            title="Advanced Notification Settings"
+            description="Customize notification preferences and sounds"
+            left={() => <List.Icon icon="bell" />}
+            onPress={() => navigation.navigate('NotificationSettings')}
+          />
+
+          <Divider />
+
+          <List.Item
+            title="Notification History"
+            description="View and manage notification history"
+            left={() => <List.Icon icon="history" />}
+            onPress={() => navigation.navigate('NotificationHistory')}
+          />
+
+          <Divider />
+
+          <List.Item
+            title="Multi-Device Testing"
+            description="Test notifications across multiple devices"
+            left={() => <List.Icon icon="devices" />}
+            onPress={() => navigation.navigate('MultiDeviceTest')}
+          />
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.card}>
+        <Card.Content>
           <Text style={styles.sectionTitle}>Account</Text>
-          
+
           <List.Item
             title="Sign Out"
             description="Sign out of your account"

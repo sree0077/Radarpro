@@ -9,6 +9,9 @@ import { TimelineScreen } from '../screens/TimelineScreen';
 import { NewReportScreen } from '../screens/NewReportScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { ReportDetailScreen } from '../screens/ReportDetailScreen';
+import { NotificationSettingsScreen } from '../screens/NotificationSettingsScreen';
+import { NotificationHistoryScreen } from '../screens/NotificationHistoryScreen';
+import { MultiDeviceTestScreen } from '../screens/MultiDeviceTestScreen';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -84,11 +87,32 @@ const MainStack = () => {
           presentation: 'modal',
         }}
       />
-      <Stack.Screen 
-        name="ReportDetail" 
+      <Stack.Screen
+        name="ReportDetail"
         component={ReportDetailScreen}
-        options={{ 
+        options={{
           title: 'Report Details',
+        }}
+      />
+      <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+        options={{
+          title: 'Notification Settings',
+        }}
+      />
+      <Stack.Screen
+        name="NotificationHistory"
+        component={NotificationHistoryScreen}
+        options={{
+          title: 'Notification History',
+        }}
+      />
+      <Stack.Screen
+        name="MultiDeviceTest"
+        component={MultiDeviceTestScreen}
+        options={{
+          title: 'Multi-Device Testing',
         }}
       />
     </Stack.Navigator>

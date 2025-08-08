@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SupabaseService } from '../services/supabase';
+import { NotificationService } from '../services/notificationService';
 import { Report } from '../types';
 
 interface UseRealtimeReportsOptions {
@@ -7,6 +8,8 @@ interface UseRealtimeReportsOptions {
   onUpdateReport?: (report: Report) => void;
   onDeleteReport?: (reportId: string) => void;
   showNotifications?: boolean;
+  enableComprehensiveNotifications?: boolean;
+  currentUserId?: string;
 }
 
 interface RealtimeNotification {
@@ -19,7 +22,9 @@ export const useRealtimeReports = (options: UseRealtimeReportsOptions = {}) => {
     onNewReport,
     onUpdateReport,
     onDeleteReport,
-    showNotifications = true
+    showNotifications = true,
+    enableComprehensiveNotifications = true,
+    currentUserId
   } = options;
 
   const [notification, setNotification] = useState<RealtimeNotification | null>(null);
@@ -52,7 +57,25 @@ export const useRealtimeReports = (options: UseRealtimeReportsOptions = {}) => {
               return;
             }
             if (newReport) {
+              // Skip notifications for reports created by current user
+              if (currentUserId && newReport.user_id === currentUserId) {
+                console.log('🔕 Skipping notification for own report');
+                onNewReport?.(newReport);
+                return;
+              }
+
               onNewReport?.(newReport);
+
+              // Send comprehensive notification
+              if (enableComprehensiveNotifications) {
+                try {
+                  await NotificationService.sendComprehensiveNotification(newReport, 'new');
+                } catch (error) {
+                  console.error('Error sending comprehensive notification:', error);
+                }
+              }
+
+              // Show in-app notification
               showNotification(
                 `New ${newReport.category} report by ${newReport.user?.username || 'Anonymous'}`,
                 'new'
@@ -66,7 +89,25 @@ export const useRealtimeReports = (options: UseRealtimeReportsOptions = {}) => {
               return;
             }
             if (updatedReport) {
+              // Skip notifications for reports updated by current user
+              if (currentUserId && updatedReport.user_id === currentUserId) {
+                console.log('🔕 Skipping notification for own report update');
+                onUpdateReport?.(updatedReport);
+                return;
+              }
+
               onUpdateReport?.(updatedReport);
+
+              // Send comprehensive notification for updates
+              if (enableComprehensiveNotifications) {
+                try {
+                  await NotificationService.sendComprehensiveNotification(updatedReport, 'update');
+                } catch (error) {
+                  console.error('Error sending comprehensive notification for update:', error);
+                }
+              }
+
+              // Show in-app notification
               showNotification(
                 `Report updated by ${updatedReport.user?.username || 'Anonymous'}`,
                 'update'
